@@ -1,0 +1,32 @@
+
+
+$ | 1 2 3 4 5 6
+$----------------
+$1| 0 0 0 0 0 0
+$2| 0 2 2 2 0 0
+$3| 0 * 0 2 b g
+$4| 0 2 2 2 0 0
+$5| 0 0 0 0 0 0
+
+
+$ key: 
+$ 0 dead
+$ 1 ice
+$ 2 normal
+letting gridInit be [[0, 0, 0, 0, 0, 0],
+                     [0, 2, 2, 2, 0, 0],
+                     [0, 2, 0, 2, 2, 2],
+                     [0, 2, 2, 2, 0, 0],
+ 		     [0, 0, 0, 0, 0, 0]]
+      
+letting avatarInitRow be 3
+letting avatarInitCol be 2
+
+letting numBlocks be 1
+
+letting blocksInitRow be [3]
+letting blocksInitCol be [5]
+
+letting blocksGoalRow be [3]
+letting blocksGoalCol be [6]
+letting steps be 5

@@ -1,0 +1,137 @@
+language ESSENCE' 1.0
+
+$$$$ Parameters $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$ grid has r rows, c columns
+$ 0: dead, 1: ice, 2: normal
+$ We assume that every grid is surrounded by dead cells
+given gridInit : matrix indexed by [int(1..r), int(1..c)] of int(0..2)
+
+$ Initial positions of avatar and blocks
+$ Doing it like this to check c, r compliance.
+given avatarInitRow : int(1..r)
+given avatarInitCol : int(1..c)
+
+given numBlocks : int
+given blocksInitRow : matrix indexed by [int(1..numBlocks)] of int(1..r)
+given blocksInitCol : matrix indexed by [int(1..numBlocks)] of int(1..c)
+
+$ Goal positions of blocks
+given blocksGoalRow : matrix indexed by [int(1..numBlocks)] of int(1..r)
+given blocksGoalCol : matrix indexed by [int(1..numBlocks)] of int(1..c)
+
+$ Number of steps
+given steps : int(1..)
+$$$$ End of Parameters $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+$$$$ Decision Variables $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+$ Decompose into row/col to control domain bounds separately/easily
+find moveRow : matrix indexed by [int(1..steps)] of int(-1..1)
+find moveCol : matrix indexed by [int(1..steps)] of int(-1..1)
+
+$ State variables. Convention is that 0 is initial position,
+$ so i is state _after_ move in step i.
+find avatarCurrentRow : matrix indexed by [int(0..steps)] of int(1..r)
+find avatarCurrentCol : matrix indexed by [int(0..steps)] of int(1..c)
+find blocksCurrentRow :
+  matrix indexed by [int(0..steps), int(1..numBlocks)] of int(1..r)
+find blocksCurrentCol :
+  matrix indexed by [int(0..steps), int(1..numBlocks)] of int(1..c)
+find gridCurrent :
+  matrix indexed by [int(0..steps), int(1..r), int(1..c)] of int(0..2)
+
+$$$$ End of Decision Variables $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+
+such that
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$                                    initialize the state
+$ 
+forAll x :int(1..r).
+  forAll y : int(1..c).
+    gridCurrent[0, x, y] = gridInit[x ,y],
+
+avatarCurrentRow[0] = avatarInitRow,
+avatarCurrentCol[0] = avatarInitCol,
+
+forAll n : int(1..numBlocks).
+  blocksCurrentRow[0,n]=blocksInitRow[n] /\ blocksCurrentCol[0,n] = blocksInitCol[n],
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$                                  update the avatar location 
+$
+forAll s : int(1..steps) .
+  avatarCurrentRow[s] = avatarCurrentRow[s-1] + moveRow[s]
+  /\
+  avatarCurrentCol[s] = avatarCurrentCol[s-1] + moveCol[s],
+
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$                                        update the grid map 
+$
+forAll x :int(1..r).
+  forAll y : int(1..c).
+    forAll s : int(1..steps) .
+      (gridInit[x,y] != 1 /\ gridCurrent[s, x, y] = gridInit[x,y] )
+      \/ 
+      (gridInit[x,y] = 1 /\ avatarCurrentRow[s-1] = x /\ avatarCurrentCol[s-1] =y 
+      /\ gridCurrent[s, x, y] = 0)
+      \/
+      ( (gridInit[x,y] = 1 /\ (avatarCurrentRow[s-1] != x \/ avatarCurrentCol[s-1] !=y)
+      /\ gridCurrent[s, x, y] = gridCurrent[s-1, x, y])
+      ),
+
+
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$                              the avatar and block never move to grid = 0 
+$
+forAll s : int(1..steps) .
+    gridCurrent[s, avatarCurrentRow[s], avatarCurrentCol[s]] > 0
+    /\
+    (forAll n :int(1..numBlocks).
+        gridCurrent[s, blocksCurrentRow[s,n],  blocksCurrentCol[s,n]] >0),
+
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$                                  update the block   
+
+forAll s : int(1..steps) .
+  forAll n : int(1..numBlocks).
+    ((avatarCurrentRow[s] != blocksCurrentRow[s-1, n] \/ avatarCurrentCol[s] != blocksCurrentCol[s-1, n])
+    /\
+    (blocksCurrentRow[s,n] = blocksCurrentRow[s-1, n] /\  blocksCurrentCol[s,n] = blocksCurrentCol[s-1, n]))
+    \/
+    ((avatarCurrentRow[s] = blocksCurrentRow[s-1, n] /\ avatarCurrentCol[s] = blocksCurrentCol[s-1, n])
+    /\
+    (blocksCurrentRow[s,n] = blocksCurrentRow[s-1, n] + moveRow[s] /\ blocksCurrentCol[s,n] = blocksCurrentCol[s-1, n] + moveCol[s])),
+
+numBlocks=1 \/    
+(forAll s : int(1..steps) .
+  forAll n1 : int(1..numBlocks).
+    forAll n2 : int(1..numBlocks).
+    (n1 = n2 /\
+      (blocksCurrentCol[s, n1] = blocksCurrentCol[s, n2] /\ blocksCurrentRow[s, n1] = blocksCurrentRow[s, n2]))
+      \/
+      n1 != n2/\
+      (blocksCurrentCol[s, n1] != blocksCurrentCol[s, n2] \/ blocksCurrentRow[s, n1] != blocksCurrentRow[s, n2])),
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$                                       move criteria 
+
+forAll s : int(1..steps) .
+   (moveRow[s] = 0 /\ moveCol[s] != 0)
+    \/
+    (moveRow[s] != 0 /\ moveCol[s] = 0),
+
+
+
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+$                                  terminal state  
+
+forAll n1 : int(1..numBlocks).
+  (exists n2 : int(1..numBlocks).
+    (blocksGoalRow[n1] =blocksCurrentRow[steps,n2] /\  blocksGoalCol[n1] = blocksCurrentCol[steps,n2])),
+
+
+
+true
